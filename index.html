@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPI CST — Exam Routine Dashboard</title>
+<meta name="description" content="Rangpur Polytechnic Institute — Computer Science & Technology, 3rd Semester Final Exam Routine with live countdown and preparation tracker.">
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===================== LOADING SCREEN ===================== -->
+<div id="loadingScreen" class="loading-screen" role="status" aria-label="Loading routine">
+  <div class="loader-ring">
+    <svg viewBox="0 0 100 100" width="72" height="72">
+      <circle cx="50" cy="50" r="42" class="loader-track"></circle>
+      <circle cx="50" cy="50" r="42" class="loader-arc"></circle>
+    </svg>
+    <i class="fa-solid fa-graduation-cap loader-icon" aria-hidden="true"></i>
+  </div>
+  <p class="loader-text">Preparing your routine<span class="dots"><span>.</span><span>.</span><span>.</span></span></p>
+</div>
+
+<!-- ===================== TOAST CONTAINER ===================== -->
+<div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ===================== CONFETTI CANVAS ===================== -->
+<canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
+
+<div class="app-shell">
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header" id="printHeader">
+    <div class="header-top">
+      <div class="brand">
+        <div class="logo-placeholder" aria-hidden="true">
+          <i class="fa-solid fa-building-columns"></i>
+        </div>
+        <div class="brand-text">
+          <h1>Rangpur Polytechnic Institute</h1>
+          <p class="dept-line">Computer Science &amp; Technology <span class="dot-sep">•</span> 3rd Semester</p>
+        </div>
+      </div>
+
+      <div class="header-controls no-print">
+        <button class="icon-btn" id="notifBtn" type="button" aria-label="Notifications" title="Notifications">
+          <i class="fa-regular fa-bell"></i>
+          <span class="notif-dot" id="notifDot" hidden></span>
+        </button>
+        <button class="icon-btn" id="darkModeBtn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <i class="fa-solid fa-moon" id="darkModeIcon"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="header-meta">
+      <h2 class="routine-title">Final Exam Routine <span class="eyebrow">— Live Dashboard</span></h2>
+      <div class="clock-block" id="clockBlock">
+        <span class="clock-date" id="clockDate">—</span>
+        <span class="clock-sep">|</span>
+        <span class="clock-time" id="clockTime">--:--:--</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===================== STATS STRIP ===================== -->
+    <section class="stats-strip no-print" aria-label="Routine summary">
+      <div class="stat-card">
+        <i class="fa-solid fa-layer-group"></i>
+        <div><span class="stat-num" id="statTotal">0</span><span class="stat-label">Total Exams</span></div>
+      </div>
+      <div class="stat-card stat-upcoming">
+        <i class="fa-solid fa-hourglass-half"></i>
+        <div><span class="stat-num" id="statUpcoming">0</span><span class="stat-label">Upcoming</span></div>
+      </div>
+      <div class="stat-card stat-done">
+        <i class="fa-solid fa-circle-check"></i>
+        <div><span class="stat-num" id="statCompleted">0</span><span class="stat-label">Completed</span></div>
+      </div>
+      <div class="stat-card stat-progress">
+        <i class="fa-solid fa-chart-line"></i>
+        <div><span class="stat-num" id="statAvgProgress">0%</span><span class="stat-label">Avg. Preparation</span></div>
+      </div>
+    </section>
+
+    <!-- ===================== NEXT EXAM HERO ===================== -->
+    <section class="next-exam-card" id="nextExamCard" aria-label="Next upcoming exam">
+      <div class="next-exam-glow" aria-hidden="true"></div>
+
+      <div class="next-exam-head">
+        <span class="next-badge"><i class="fa-solid fa-bolt"></i> Next Exam</span>
+        <span class="status-badge" id="nextStatusBadge">Upcoming</span>
+      </div>
+
+      <div class="next-exam-body">
+        <div class="next-exam-info">
+          <h3 id="nextSubject">—</h3>
+          <p class="next-code" id="nextCode">Code: —</p>
+          <p class="next-date" id="nextDate"><i class="fa-regular fa-calendar"></i> —</p>
+          <p class="next-time" id="nextTime"><i class="fa-regular fa-clock"></i> —</p>
+
+          <div class="prep-control">
+            <label for="nextPrepRange">Your preparation level</label>
+            <div class="prep-row">
+              <input type="range" id="nextPrepRange" min="0" max="100" step="5" value="0" aria-describedby="nextPrepValue">
+              <span id="nextPrepValue">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="next-exam-rings">
+          <div class="ring-block">
+            <svg viewBox="0 0 120 120" class="ring-svg">
+              <circle cx="60" cy="60" r="52" class="ring-track"></circle>
+              <circle cx="60" cy="60" r="52" class="ring-arc ring-arc-time" id="ringTime"></circle>
+            </svg>
+            <div class="ring-center">
+              <span class="ring-days" id="ringDays">–</span>
+              <span class="ring-days-label">days left</span>
+            </div>
+          </div>
+          <div class="countdown-figures" id="countdownFigures">
+            <div class="figure"><span id="cdHours">00</span><small>Hours</small></div>
+            <div class="figure"><span id="cdMinutes">00</span><small>Minutes</small></div>
+            <div class="figure"><span id="cdSeconds">00</span><small>Seconds</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="next-exam-progressbar" aria-hidden="true">
+        <div class="progressbar-track">
+          <div class="progressbar-fill" id="nextTimeProgressFill"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== QUOTE OF THE DAY ===================== -->
+    <section class="quote-strip no-print" id="quoteStrip">
+      <i class="fa-solid fa-quote-left" aria-hidden="true"></i>
+      <p id="quoteText">Loading today's motivation…</p>
+    </section>
+
+    <!-- ===================== TOOLBAR: SEARCH / FILTER / SORT ===================== -->
+    <section class="toolbar no-print" aria-label="Search, filter and sort exams">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="text" id="searchInput" placeholder="Search subject, code, day or date…" aria-label="Search exams">
+        <button type="button" id="clearSearchBtn" class="clear-search-btn" hidden aria-label="Clear search">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="filter-group" role="group" aria-label="Filter exams">
+        <button class="filter-chip active" data-filter="all" type="button">All</button>
+        <button class="filter-chip" data-filter="upcoming" type="button">Upcoming</button>
+        <button class="filter-chip" data-filter="today" type="button">Today</button>
+        <button class="filter-chip" data-filter="completed" type="button">Completed</button>
+      </div>
+
+      <div class="sort-group">
+        <label for="sortSelect"><i class="fa-solid fa-arrow-down-wide-short"></i></label>
+        <select id="sortSelect" aria-label="Sort exams">
+          <option value="date">Sort by Date</option>
+          <option value="subject">Sort by Subject</option>
+          <option value="code">Sort by Code</option>
+          <option value="progress">Sort by Preparation</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- ===================== ROUTINE LIST ===================== -->
+    <section class="routine-section" aria-label="Full exam routine">
+      <div class="routine-table-wrap" id="routineTableWrap">
+        <table class="routine-table" id="routineTable">
+          <thead>
+            <tr>
+              <th scope="col">Date &amp; Day</th>
+              <th scope="col">Time</th>
+              <th scope="col">Subject &amp; Code</th>
+              <th scope="col">Countdown</th>
+              <th scope="col">Preparation</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="routineTableBody"><!-- injected by JS --></tbody>
+        </table>
+      </div>
+
+      <div class="routine-cards" id="routineCards"><!-- injected by JS for mobile --></div>
+
+      <div class="empty-state" id="emptyState" hidden>
+        <i class="fa-regular fa-folder-open"></i>
+        <h3>No exams match your search</h3>
+        <p>Try a different subject, code, day or date — or clear your filters.</p>
+        <button type="button" id="resetFiltersBtn" class="btn-outline">Reset filters</button>
+      </div>
+    </section>
+
+    <!-- ===================== ACTION BAR ===================== -->
+    <section class="action-bar no-print" aria-label="Routine actions">
+      <button class="action-btn" id="printBtn" type="button"><i class="fa-solid fa-print"></i> Print</button>
+      <button class="action-btn" id="downloadPdfBtn" type="button"><i class="fa-solid fa-file-arrow-down"></i> Download PDF</button>
+      <button class="action-btn" id="copyBtn" type="button"><i class="fa-regular fa-copy"></i> Copy Routine</button>
+      <button class="action-btn" id="shareBtn" type="button"><i class="fa-solid fa-share-nodes"></i> Share</button>
+    </section>
+
+    <!-- ===================== CHAPTER PROGRESS TRACKER (added feature) ===================== -->
+    <section class="chapter-progress-section no-print" id="chapterProgressSection" aria-label="Chapter wise preparation tracker">
+      <div class="cp-header">
+        <h2><i class="fa-solid fa-book-open-reader"></i> Chapter Progress Tracker</h2>
+        <p class="cp-sub">Tick off chapters as you finish them — tracked per subject, saved automatically on this device.</p>
+      </div>
+
+      <div class="cp-summary">
+        <div class="cp-summary-ring">
+          <svg viewBox="0 0 120 120" class="ring-svg cp-ring-svg">
+            <circle cx="60" cy="60" r="52" class="ring-track cp-ring-track"></circle>
+            <circle cx="60" cy="60" r="52" class="ring-arc cp-overall-arc" id="cpOverallArc"></circle>
+          </svg>
+          <div class="ring-center cp-overall-center">
+            <span id="cpOverallPercent">0%</span>
+            <small>Overall</small>
+          </div>
+        </div>
+
+        <div class="cp-summary-stats">
+          <div class="cp-stat">
+            <span class="cp-stat-num" id="cpTotalSubjects">0</span>
+            <span class="cp-stat-label">Subjects</span>
+          </div>
+          <div class="cp-stat">
+            <span class="cp-stat-num" id="cpTotalChapters">0</span>
+            <span class="cp-stat-label">Total Chapters</span>
+          </div>
+          <div class="cp-stat cp-stat-green">
+            <span class="cp-stat-num" id="cpCompletedChapters">0</span>
+            <span class="cp-stat-label">Completed</span>
+          </div>
+          <div class="cp-stat cp-stat-gray">
+            <span class="cp-stat-num" id="cpRemainingChapters">0</span>
+            <span class="cp-stat-label">Remaining</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="cp-overall-bar-track" aria-hidden="true">
+        <div class="cp-overall-bar-fill" id="cpOverallBarFill"></div>
+      </div>
+      <p class="cp-motivation" id="cpMotivation">Let's Start Your Preparation.</p>
+
+      <div class="cp-toolbar">
+        <div class="search-box cp-search-box">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="text" id="cpSearchInput" placeholder="Search a chapter…" aria-label="Search chapters">
+          <button type="button" id="cpClearSearchBtn" class="clear-search-btn" hidden aria-label="Clear chapter search">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="filter-group" role="group" aria-label="Filter chapters">
+          <button class="filter-chip active" data-cp-filter="all" type="button">All</button>
+          <button class="filter-chip" data-cp-filter="completed" type="button">Completed</button>
+          <button class="filter-chip" data-cp-filter="incomplete" type="button">Incomplete</button>
+        </div>
+
+        <div class="cp-actions">
+          <button class="action-btn" id="cpExportBtn" type="button"><i class="fa-solid fa-file-export"></i> Export JSON</button>
+          <button class="action-btn" id="cpResetBtn" type="button"><i class="fa-solid fa-rotate-left"></i> Reset Progress</button>
+        </div>
+      </div>
+
+      <div class="cp-accordion" id="cpAccordion"><!-- injected by JS --></div>
+
+      <div class="empty-state cp-empty-state" id="cpEmptyState" hidden>
+        <i class="fa-regular fa-folder-open"></i>
+        <h3>No chapters match your search</h3>
+        <p>Try a different keyword or clear the filter.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer no-print">
+    <p>Rangpur Polytechnic Institute · Computer Science &amp; Technology · Built for CST students</p>
+  </footer>
+</div>
+
+<!-- Floating scroll to top -->
+<button id="scrollTopBtn" class="scroll-top-btn no-print" type="button" aria-label="Scroll to top" hidden>
+  <i class="fa-solid fa-arrow-up"></i>
+</button>
+
+<script src="script.js"></script>
+</body>
+</html>
