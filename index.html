@@ -36,6 +36,26 @@
 <!-- ===================== CONFETTI CANVAS ===================== -->
 <canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
 
+<!-- ===================== ONBOARDING / PROFILE MODAL ===================== -->
+<div class="onboarding-overlay no-print" id="onboardingOverlay" hidden>
+  <div class="onboarding-modal" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+    <div class="onboarding-emoji">👋</div>
+    <h3 id="onboardingTitle">Welcome, Future Topper!</h3>
+    <p class="onboarding-sub" id="onboardingSub">Let's personalize your experience.</p>
+
+    <label for="onboardingNameInput">Student Name</label>
+    <input type="text" id="onboardingNameInput" placeholder="Enter your full name" autocomplete="off">
+
+    <label for="onboardingRollInput">Roll Number</label>
+    <input type="text" id="onboardingRollInput" placeholder="e.g. 123456" autocomplete="off" inputmode="numeric" maxlength="6">
+
+    <button type="button" class="onboarding-continue-btn" id="onboardingContinueBtn">Continue</button>
+    <button type="button" class="onboarding-skip-btn" id="onboardingSkipBtn">Skip for now</button>
+  </div>
+</div>
+
+
+
 <div class="app-shell">
 
   <!-- ===================== HEADER ===================== -->
@@ -59,6 +79,18 @@
         <button class="icon-btn" id="darkModeBtn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
           <i class="fa-solid fa-moon" id="darkModeIcon"></i>
         </button>
+        <div class="profile-menu-wrap">
+          <button class="icon-btn" id="profileBtn" type="button" aria-label="Profile menu" title="Profile" aria-haspopup="true" aria-expanded="false">
+            <i class="fa-solid fa-user"></i>
+          </button>
+          <div class="profile-menu" id="profileMenu" hidden>
+            <div class="profile-menu-name" id="profileMenuName">Student</div>
+            <button type="button" data-profile-action="edit-name"><i class="fa-solid fa-pen"></i> Edit Name</button>
+            <button type="button" data-profile-action="edit-roll"><i class="fa-solid fa-id-card"></i> Edit Roll Number</button>
+            <button type="button" data-profile-action="reset"><i class="fa-solid fa-rotate-left"></i> Reset Profile</button>
+            <button type="button" class="profile-menu-danger" data-profile-action="logout"><i class="fa-solid fa-right-from-bracket"></i> Logout Profile</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -73,6 +105,19 @@
   </header>
 
   <main>
+
+    <!-- ===================== PERSONALIZED WELCOME ===================== -->
+    <section class="welcome-card no-print" id="welcomeCard" aria-label="Welcome">
+      <div class="welcome-left">
+        <h2 id="welcomeGreeting">👋 Hello, Student</h2>
+        <p class="welcome-sub" id="welcomeSub">Ready to continue your preparation today?</p>
+        <p class="welcome-motivation" id="welcomeMotivation"></p>
+      </div>
+      <div class="welcome-right">
+        <span class="welcome-stat-num" id="welcomeChapterCount">0</span>
+        <span class="welcome-stat-label">Chapters Completed</span>
+      </div>
+    </section>
 
     <!-- ===================== STATS STRIP ===================== -->
     <section class="stats-strip no-print" aria-label="Routine summary">
@@ -111,9 +156,14 @@
           <p class="next-time" id="nextTime"><i class="fa-regular fa-clock"></i> —</p>
 
           <div class="prep-control">
-            <label for="nextPrepRange">Your preparation level</label>
+            <div class="prep-label-row">
+              <label>Preparation <span class="prep-source">(from chapter tracker)</span></label>
+              <button type="button" class="prep-jump-btn" id="nextPrepJumpBtn">
+                <i class="fa-solid fa-arrow-down"></i> View chapters
+              </button>
+            </div>
             <div class="prep-row">
-              <input type="range" id="nextPrepRange" min="0" max="100" step="5" value="0" aria-describedby="nextPrepValue">
+              <div class="prep-bar-track"><div class="prep-bar-fill" id="nextPrepFill"></div></div>
               <span id="nextPrepValue">0%</span>
             </div>
           </div>
@@ -259,6 +309,8 @@
       </div>
       <p class="cp-motivation" id="cpMotivation">Let's Start Your Preparation.</p>
 
+      <div class="cp-insights" id="cpInsights"><!-- injected by JS --></div>
+
       <div class="cp-toolbar">
         <div class="search-box cp-search-box">
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
@@ -275,7 +327,6 @@
         </div>
 
         <div class="cp-actions">
-          <button class="action-btn" id="cpExportBtn" type="button"><i class="fa-solid fa-file-export"></i> Export JSON</button>
           <button class="action-btn" id="cpResetBtn" type="button"><i class="fa-solid fa-rotate-left"></i> Reset Progress</button>
         </div>
       </div>

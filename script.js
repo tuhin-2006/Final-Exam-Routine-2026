@@ -28,7 +28,17 @@
     "Your future is created by what you do today, not tomorrow.",
     "The pain of studying is nothing compared to the pain of not knowing.",
     "Push yourself, because no one else is going to do it for you.",
-    "Every exam is a chance to prove how far you've come."
+    "Every exam is a chance to prove how far you've come.",
+    "Consistency beats intensity — show up for your books every single day.",
+    "Hard work beats talent when talent doesn't work hard.",
+    "You don't have to be great to start, but you have to start to be great.",
+    "Small steps every day lead to big results every year.",
+    "Believe you can and you're halfway there.",
+    "The only way to do great work is to love what you study.",
+    "Well begun is half done — start today's chapter now.",
+    "Difficult roads often lead to beautiful destinations.",
+    "One more chapter today is one less worry tomorrow.",
+    "Preparation is the bridge between dreams and achievement.",
   ];
 
   const LS_KEYS = {
@@ -128,6 +138,16 @@
     return state.progress[code] ?? 0;
   }
 
+  // Preparation % now comes from the chapter tracker (chapters checked off
+  // below) whenever chapter data exists for that subject; falls back to the
+  // legacy manual value only if a subject has no chapter list defined.
+  function getPrepPercent(code) {
+    if (typeof CHAPTERS !== 'undefined' && CHAPTERS[code]) {
+      return cpSubjectStats(code).percent;
+    }
+    return getProgress(code);
+  }
+
   function setProgress(code, value) {
     state.progress[code] = value;
     persist(LS_KEYS.progress, state.progress);
@@ -195,18 +215,14 @@
     // Overall time-progress bar (same fraction)
     document.getElementById('nextTimeProgressFill').style.width = `${fraction * 100}%`;
 
-    // Prep range control, synced to stored progress
-    const range = document.getElementById('nextPrepRange');
+    // Preparation display, driven by the chapter tracker below
+    const fill = document.getElementById('nextPrepFill');
     const val = document.getElementById('nextPrepValue');
-    const stored = getProgress(exam.code);
-    if (document.activeElement !== range) range.value = stored;
-    val.textContent = `${stored}%`;
-    range.oninput = (e) => {
-      val.textContent = `${e.target.value}%`;
-    };
-    range.onchange = (e) => {
-      setProgress(exam.code, Number(e.target.value));
-    };
+    const prepPercent = getPrepPercent(exam.code);
+    fill.style.width = `${prepPercent}%`;
+    val.textContent = `${prepPercent}%`;
+    const jumpBtn = document.getElementById('nextPrepJumpBtn');
+    jumpBtn.onclick = () => jumpToChapter(exam.code);
 
     // Confetti once per day when an exam transitions into "today"
     const today = now.toISOString().slice(0, 10);
@@ -227,7 +243,7 @@
     const completed = cds.filter(c => c.status === 'completed').length;
     const upcoming = total - completed;
     const avgProgress = Math.round(
-      EXAMS.reduce((sum, e) => sum + getProgress(e.code), 0) / total
+      EXAMS.reduce((sum, e) => sum + getPrepPercent(e.code), 0) / total
     );
 
     document.getElementById('statTotal').textContent = total;
@@ -261,7 +277,7 @@
       switch (state.sort) {
         case 'subject': return a.subject.localeCompare(b.subject);
         case 'code': return a.code.localeCompare(b.code);
-        case 'progress': return getProgress(b.code) - getProgress(a.code);
+        case 'progress': return getPrepPercent(b.code) - getPrepPercent(a.code);
         default: return examDateTime(a) - examDateTime(b);
       }
     });
@@ -273,14 +289,13 @@
      8. TABLE + CARD RENDER
      --------------------------------------------------------- */
   function buildMiniProgress(exam, prefix) {
-    const val = getProgress(exam.code);
+    const val = getPrepPercent(exam.code);
     return `
-      <div class="mini-progress">
+      <button type="button" class="mini-progress" data-code="${exam.code}" title="Open ${escapeHtml(exam.subject)} in the chapter tracker">
         <div class="mini-progress-track"><div class="mini-progress-fill" style="width:${val}%"></div></div>
-        <input type="range" min="0" max="100" step="5" value="${val}"
-          data-code="${exam.code}" class="progress-input" aria-label="Preparation for ${escapeHtml(exam.subject)}">
         <span class="mini-progress-val">${val}%</span>
-      </div>`;
+        <i class="fa-solid fa-arrow-up-right-from-square mini-progress-link-icon"></i>
+      </button>`;
   }
 
   function escapeHtml(str) {
@@ -375,8 +390,10 @@
           </td>
           <td class="cell-time">${exam.time}</td>
           <td>
-            <span class="cell-subject">${escapeHtml(exam.subject)}</span>
-            <span class="cell-code">${exam.code}</span>
+            <button type="button" class="cell-subject-btn" data-code="${exam.code}" title="Open ${escapeHtml(exam.subject)} in the chapter tracker">
+              <span class="cell-subject">${escapeHtml(exam.subject)}</span>
+              <span class="cell-code">${exam.code}</span>
+            </button>
           </td>
           <td class="cell-countdown ${cdClass}">${cdText}</td>
           <td>${buildMiniProgress(exam)}</td>
@@ -391,15 +408,15 @@
         : cd.status === 'today' ? `Today · ${String(cd.hours).padStart(2,'0')}h ${String(cd.minutes).padStart(2,'0')}m left`
         : `${cd.days}d ${cd.hours}h ${cd.minutes}m left`;
       const cdClass = cd.status === 'completed' ? 'is-done' : cd.status === 'today' ? 'is-today' : '';
-      const val = getProgress(exam.code);
+      const val = getPrepPercent(exam.code);
 
       return `
         <div class="routine-card" data-code="${exam.code}">
           <div class="rc-top">
-            <div>
+            <button type="button" class="rc-subject-btn" data-code="${exam.code}" title="Open ${escapeHtml(exam.subject)} in the chapter tracker">
               <span class="rc-subject">${escapeHtml(exam.subject)}</span>
               <span class="rc-code">Code: ${exam.code}</span>
-            </div>
+            </button>
             <span class="status-pill status-${meta.color}"><i class="fa-solid ${meta.icon}"></i>${meta.label}</span>
           </div>
           <div class="rc-meta">
@@ -408,25 +425,18 @@
             <span><i class="fa-solid fa-calendar-day"></i>${dayName(exam)}</span>
           </div>
           <div class="rc-countdown ${cdClass}">${cdText}</div>
-          <div class="rc-progress">
-            <input type="range" min="0" max="100" step="5" value="${val}" data-code="${exam.code}" class="progress-input" aria-label="Preparation for ${escapeHtml(exam.subject)}">
+          <button type="button" class="rc-progress" data-code="${exam.code}" title="Open ${escapeHtml(exam.subject)} in the chapter tracker">
+            <div class="rc-progress-track"><div class="rc-progress-fill" style="width:${val}%"></div></div>
             <span class="rc-progress-val">${val}%</span>
-          </div>
+            <i class="fa-solid fa-arrow-up-right-from-square mini-progress-link-icon"></i>
+          </button>
         </div>`;
     }).join('');
 
-    // Wire up progress inputs (both table + cards)
-    document.querySelectorAll('.progress-input').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const container = e.target.closest('.mini-progress, .rc-progress');
-        const label = container.querySelector('.mini-progress-val, .rc-progress-val');
-        const fill = container.querySelector('.mini-progress-fill');
-        if (label) label.textContent = `${e.target.value}%`;
-        if (fill) fill.style.width = `${e.target.value}%`;
-      });
-      input.addEventListener('change', (e) => {
-        setProgress(e.target.dataset.code, Number(e.target.value));
-      });
+    // Clicking a preparation bar or subject name (table or card) jumps to
+    // that subject's chapters in the tracker below and expands it.
+    document.querySelectorAll('.mini-progress, .rc-progress, .cell-subject-btn, .rc-subject-btn').forEach(btn => {
+      btn.addEventListener('click', () => jumpToChapter(btn.dataset.code));
     });
   }
 
@@ -439,6 +449,7 @@
     renderNextExam(now);
     renderStats(now);
     renderRoutine(now);
+    renderWelcomeGreeting();
   }
 
   /* ---------------------------------------------------------
@@ -522,10 +533,18 @@
   /* ---------------------------------------------------------
      13. QUOTE OF THE DAY (stable per calendar day)
      --------------------------------------------------------- */
-  function renderQuote() {
-    const dayIndex = Math.floor(Date.now() / 86400000);
-    const quote = QUOTES[dayIndex % QUOTES.length];
-    document.getElementById('quoteText').textContent = quote;
+  function renderQuote(isFirstRun) {
+    const el = document.getElementById('quoteText');
+    const pick = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    if (isFirstRun) {
+      el.textContent = pick;
+      return;
+    }
+    el.classList.add('quote-fade-out');
+    setTimeout(() => {
+      el.textContent = pick;
+      el.classList.remove('quote-fade-out');
+    }, 280);
   }
 
   /* ---------------------------------------------------------
@@ -782,27 +801,84 @@
     ],
   };
 
-  const CP_LS_KEY = 'rpi_chapter_progress'; // { [code]: [bool, bool, ...] }
-  const CP_EXPANDED_KEY = 'rpi_chapter_expanded'; // [code, code, ...]
+  const CP_LS_KEY = 'rpi_chapter_progress';       // { [code]: [{status, starred, completedAt}, ...] }
+  const CP_OPEN_KEY = 'rpi_chapter_open_subject';  // single code string, or null — "remember last opened subject"
+  const CP_ACTIVITY_KEY = 'rpi_chapter_activity_dates'; // ['YYYY-MM-DD', ...] — for streak/pace
+  const CP_REMIND_KEY = 'rpi_exam_remind_fired';   // { [code]: 'YYYY-MM-DD' }
+  const CP_TIP_KEY = 'rpi_study_tip_fired';        // 'YYYY-MM-DD'
+
+  const CP_STATUS_ORDER = ['incomplete', 'reading', 'completed'];
+  const CP_DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
+  const CP_TIME_OPTIONS = [20, 30, 45, 60];
 
   let cpState = safeParse(localStorage.getItem(CP_LS_KEY), {});
-  let cpExpanded = new Set(safeParse(localStorage.getItem(CP_EXPANDED_KEY), []));
+  let cpOpenCode = safeParse(localStorage.getItem(CP_OPEN_KEY), null);
+  let examRemindFired = safeParse(localStorage.getItem(CP_REMIND_KEY), {});
   let cpSearch = '';
   let cpFilter = 'all';
+
+  // Migrate any older boolean-array progress data into the richer
+  // { status, starred, completedAt } shape used below.
+  (function migrateChapterState() {
+    let touched = false;
+    Object.keys(cpState).forEach(code => {
+      const arr = cpState[code] || [];
+      cpState[code] = arr.map(item => {
+        if (item && typeof item === 'object') return item;
+        touched = true;
+        return { status: item ? 'completed' : 'incomplete', starred: false, completedAt: item ? new Date().toISOString() : null };
+      });
+    });
+    if (touched) persist(CP_LS_KEY, cpState);
+  })();
 
   function cpSubjectName(code) {
     const exam = EXAMS.find(e => e.code === code);
     return exam ? exam.subject : code;
   }
 
-  function cpIsDone(code, idx) {
-    return !!(cpState[code] && cpState[code][idx]);
+  function cpGetChapter(code, idx) {
+    if (!cpState[code]) cpState[code] = [];
+    if (!cpState[code][idx]) cpState[code][idx] = { status: 'incomplete', starred: false, completedAt: null };
+    return cpState[code][idx];
   }
 
-  function cpSetDone(code, idx, value) {
-    if (!cpState[code]) cpState[code] = [];
-    cpState[code][idx] = value;
+  function cpIsDone(code, idx) {
+    return cpGetChapter(code, idx).status === 'completed';
+  }
+
+  function cpDifficulty(code, idx) {
+    return CP_DIFFICULTIES[(idx + code.length) % CP_DIFFICULTIES.length];
+  }
+  function cpEstMinutes(code, idx) {
+    return CP_TIME_OPTIONS[(idx * 2 + code.length) % CP_TIME_OPTIONS.length];
+  }
+
+  function cpRecordActivityToday() {
+    const dates = new Set(safeParse(localStorage.getItem(CP_ACTIVITY_KEY), []));
+    dates.add(new Date().toISOString().slice(0, 10));
+    persist(CP_ACTIVITY_KEY, Array.from(dates));
+  }
+
+  function cpSetStatus(code, idx, status) {
+    const ch = cpGetChapter(code, idx);
+    ch.status = status;
+    ch.completedAt = status === 'completed' ? new Date().toISOString() : null;
     persist(CP_LS_KEY, cpState);
+  }
+
+  function cpToggleStar(code, idx) {
+    const ch = cpGetChapter(code, idx);
+    ch.starred = !ch.starred;
+    persist(CP_LS_KEY, cpState);
+  }
+
+  function cpStatusMeta(status) {
+    switch (status) {
+      case 'completed': return { icon: 'fa-check', cls: 'cp-status-completed', label: 'Completed' };
+      case 'reading':   return { icon: 'fa-book-open', cls: 'cp-status-reading', label: 'Reading' };
+      default:          return { icon: 'fa-circle', cls: 'cp-status-incomplete', label: 'Incomplete' };
+    }
   }
 
   function cpSubjectStats(code) {
@@ -839,6 +915,71 @@
     return "Let's Start Your Preparation.";
   }
 
+  /* ---- Dashboard insights: streak, pace, ETA, weakest/strongest, today's goal ---- */
+
+  function cpStudyStreak() {
+    const dates = new Set(safeParse(localStorage.getItem(CP_ACTIVITY_KEY), []));
+    let streak = 0;
+    const cursor = new Date();
+    const todayStr = cursor.toISOString().slice(0, 10);
+    if (!dates.has(todayStr)) cursor.setDate(cursor.getDate() - 1);
+    while (dates.has(cursor.toISOString().slice(0, 10))) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }
+
+  function cpAvgPaceAndEta() {
+    const activeDays = safeParse(localStorage.getItem(CP_ACTIVITY_KEY), []).length;
+    const overall = cpOverallStats();
+    if (overall.remainingChapters === 0 && overall.totalChapters > 0) return { pace: 0, eta: 'Done' };
+    if (activeDays === 0 || overall.completedChapters === 0) return { pace: 0, eta: null };
+    const pace = overall.completedChapters / activeDays;
+    if (pace <= 0) return { pace: 0, eta: null };
+    const daysNeeded = Math.ceil(overall.remainingChapters / pace);
+    const eta = new Date();
+    eta.setDate(eta.getDate() + daysNeeded);
+    return { pace, eta: eta.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) };
+  }
+
+  function cpWeakStrongSubjects() {
+    const withData = Object.keys(CHAPTERS)
+      .map(code => ({ code, name: cpSubjectName(code), ...cpSubjectStats(code) }))
+      .filter(s => s.total > 0);
+    if (!withData.length) return { weak: null, strong: null };
+    const sorted = [...withData].sort((a, b) => a.percent - b.percent);
+    return { weak: sorted[0], strong: sorted[sorted.length - 1] };
+  }
+
+  function cpTodaysGoal(now) {
+    const next = getNextExam(now);
+    if (!next) return 'All exams completed — great work!';
+    const code = next.exam.code;
+    const chapters = CHAPTERS[code] || [];
+    const idx = chapters.findIndex((_, i) => !cpIsDone(code, i));
+    if (idx === -1) return `${next.exam.subject}: all chapters done — time to revise!`;
+    return `${next.exam.subject}: study "${chapters[idx]}"`;
+  }
+
+  function renderChapterInsights() {
+    const el = document.getElementById('cpInsights');
+    if (!el) return;
+    const { weak, strong } = cpWeakStrongSubjects();
+    const { pace, eta } = cpAvgPaceAndEta();
+    const streak = cpStudyStreak();
+    const goal = cpTodaysGoal(new Date());
+
+    el.innerHTML = `
+      <div class="cp-insight"><i class="fa-solid fa-bullseye"></i><div><span>Today's Goal</span><small>${escapeHtml(goal)}</small></div></div>
+      <div class="cp-insight"><i class="fa-solid fa-arrow-trend-down"></i><div><span>Weakest Subject</span><small>${weak ? `${escapeHtml(weak.name)} (${weak.percent}%)` : '—'}</small></div></div>
+      <div class="cp-insight"><i class="fa-solid fa-arrow-trend-up"></i><div><span>Strongest Subject</span><small>${strong ? `${escapeHtml(strong.name)} (${strong.percent}%)` : '—'}</small></div></div>
+      <div class="cp-insight"><i class="fa-solid fa-fire"></i><div><span>Study Streak</span><small>${streak} day${streak === 1 ? '' : 's'}</small></div></div>
+      <div class="cp-insight"><i class="fa-solid fa-gauge-high"></i><div><span>Avg. Pace</span><small>${pace ? pace.toFixed(1) + ' ch/day' : '—'}</small></div></div>
+      <div class="cp-insight"><i class="fa-regular fa-calendar-check"></i><div><span>Est. Completion</span><small>${eta || '—'}</small></div></div>
+    `;
+  }
+
   const CP_RING_CIRCUMFERENCE = 2 * Math.PI * 52;
 
   function renderChapterSummary() {
@@ -854,12 +995,14 @@
     const arc = document.getElementById('cpOverallArc');
     arc.style.strokeDasharray = CP_RING_CIRCUMFERENCE;
     arc.style.strokeDashoffset = CP_RING_CIRCUMFERENCE * (1 - s.percent / 100);
+
+    renderChapterInsights();
   }
 
   function cpChapterMatchesFilter(code, idx) {
-    const done = cpIsDone(code, idx);
-    if (cpFilter === 'completed' && !done) return false;
-    if (cpFilter === 'incomplete' && done) return false;
+    const status = cpGetChapter(code, idx).status;
+    if (cpFilter === 'completed' && status !== 'completed') return false;
+    if (cpFilter === 'incomplete' && status === 'completed') return false;
     if (cpSearch) {
       const text = (CHAPTERS[code][idx] || '').toLowerCase();
       if (!text.includes(cpSearch.toLowerCase())) return false;
@@ -867,67 +1010,165 @@
     return true;
   }
 
+  /* ---- Smart notifications: milestone + reminder + tip ---- */
+
+  function cpCheckMilestones(subjectName, prevPercent, newPercent) {
+    const thresholds = [25, 50, 70, 90, 100];
+    const crossed = thresholds.filter(t => prevPercent < t && newPercent >= t);
+    if (!crossed.length) return;
+    const top = crossed[crossed.length - 1];
+    if (top === 100) {
+      showToast(`🎉 ${subjectName} fully completed! All chapters done.`, 'success', 'fa-solid fa-trophy');
+    } else {
+      showToast(`🔥 Awesome! ${subjectName} preparation reached ${top}%.`, 'success', 'fa-solid fa-fire');
+    }
+  }
+
+  function maybeStudyTipToast() {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem(CP_TIP_KEY) === todayStr) return;
+    localStorage.setItem(CP_TIP_KEY, todayStr);
+    setTimeout(() => {
+      showToast("📚 Study Tip: Revise today's completed chapter before sleeping.", 'info', 'fa-solid fa-book');
+    }, 4000);
+  }
+
+  function maybeExamReminder(now) {
+    const next = getNextExam(now);
+    if (!next || next.cd.status === 'completed') return;
+    if (next.cd.days > 5) return;
+    const todayStr = now.toISOString().slice(0, 10);
+    if (examRemindFired[next.exam.code] === todayStr) return;
+    examRemindFired[next.exam.code] = todayStr;
+    persist(CP_REMIND_KEY, examRemindFired);
+    showToast(`⏰ Reminder: ${next.exam.subject} exam is only ${next.cd.days} day(s) away.`, 'info', 'fa-regular fa-clock');
+  }
+
+  function cpCycleStatus(code, idx) {
+    const subjectName = cpSubjectName(code);
+    const prevPercent = cpSubjectStats(code).percent;
+    const current = cpGetChapter(code, idx).status;
+    const next = CP_STATUS_ORDER[(CP_STATUS_ORDER.indexOf(current) + 1) % CP_STATUS_ORDER.length];
+    cpSetStatus(code, idx, next);
+    const newPercent = cpSubjectStats(code).percent;
+
+    if (next === 'completed') {
+      cpRecordActivityToday();
+      showToast(`🎉 Great job! You completed "${CHAPTERS[code][idx]}".`, 'success', 'fa-solid fa-circle-check');
+      maybeStudyTipToast();
+    }
+    cpCheckMilestones(subjectName, prevPercent, newPercent);
+    renderChapterProgress();
+  }
+
+  /* ---- Accordion (single-open, remembers last opened subject) ---- */
+
   function renderChapterAccordion() {
     const wrap = document.getElementById('cpAccordion');
     const emptyState = document.getElementById('cpEmptyState');
     const codes = Object.keys(CHAPTERS);
+    const now = new Date();
 
     let anyVisible = false;
 
     wrap.innerHTML = codes.map(code => {
       const chapters = CHAPTERS[code];
       const stats = cpSubjectStats(code);
+      const exam = EXAMS.find(e => e.code === code);
+      const examCd = exam ? getCountdown(exam, now) : null;
       const visibleIdxs = chapters.map((_, idx) => idx).filter(idx => cpChapterMatchesFilter(code, idx));
       const hasVisible = visibleIdxs.length > 0;
       if (hasVisible) anyVisible = true;
 
       // Auto-expand a subject while the student is actively searching for a match in it.
-      const expanded = cpExpanded.has(code) || (cpSearch.trim() !== '' && hasVisible);
+      const expanded = code === cpOpenCode || (cpSearch.trim() !== '' && hasVisible);
 
       const itemsHtml = chapters.map((text, idx) => {
-        const done = cpIsDone(code, idx);
+        const chState = cpGetChapter(code, idx);
+        const meta = cpStatusMeta(chState.status);
         const matches = cpChapterMatchesFilter(code, idx);
+        const difficulty = cpDifficulty(code, idx);
+        const estMin = cpEstMinutes(code, idx);
+        const dateBadge = chState.completedAt
+          ? `<span class="cp-badge cp-date"><i class="fa-regular fa-calendar-check"></i> ${new Date(chState.completedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>`
+          : '';
         return `
-          <label class="cp-chapter-item ${done ? 'cp-done' : ''} ${matches ? '' : 'cp-hidden'}">
-            <input type="checkbox" class="cp-chapter-checkbox" data-code="${code}" data-idx="${idx}" ${done ? 'checked' : ''}>
-            <span class="cp-check-icon"><i class="fa-solid fa-check"></i></span>
-            <span class="cp-chapter-text">${escapeHtml(text)}</span>
-          </label>`;
+          <div class="cp-chapter-item ${meta.cls} ${matches ? '' : 'cp-hidden'}">
+            <button type="button" class="cp-status-btn" data-code="${code}" data-idx="${idx}" title="Status: ${meta.label} (click to change)" aria-label="Chapter status: ${meta.label}">
+              <i class="fa-solid ${meta.icon}"></i>
+            </button>
+            <div class="cp-chapter-main">
+              <span class="cp-chapter-text">${escapeHtml(text)}</span>
+              <div class="cp-chapter-meta">
+                <span class="cp-badge cp-diff-${difficulty.toLowerCase()}">${difficulty}</span>
+                <span class="cp-badge cp-time"><i class="fa-regular fa-clock"></i> ${estMin}m</span>
+                ${dateBadge}
+              </div>
+            </div>
+            <button type="button" class="cp-star-btn ${chState.starred ? 'active' : ''}" data-code="${code}" data-idx="${idx}" title="${chState.starred ? 'Unmark important' : 'Mark important'}" aria-label="Toggle important">
+              <i class="fa-${chState.starred ? 'solid' : 'regular'} fa-star"></i>
+            </button>
+          </div>`;
       }).join('');
 
+      const examMetaText = exam
+        ? ` · Exam: ${formatDatePretty(exam)} (${examCd.status === 'completed' ? 'Completed' : examCd.days + 'd left'})`
+        : '';
+
       return `
-        <div class="cp-subject ${hasVisible ? '' : 'cp-hidden'}" data-code="${code}" data-expanded="${expanded}">
-          <button type="button" class="cp-subject-header" data-cp-toggle="${code}" aria-expanded="${expanded}">
-            <span class="cp-chevron"><i class="fa-solid fa-chevron-right"></i></span>
-            <span class="cp-subject-name">${escapeHtml(cpSubjectName(code))}</span>
-            <span class="cp-subject-percent">${stats.percent}%</span>
-          </button>
+        <div class="cp-subject ${hasVisible ? '' : 'cp-hidden'}" data-code="${code}">
+          <div class="cp-subject-header-row">
+            <button type="button" class="cp-subject-toggle" data-cp-toggle="${code}" aria-expanded="${expanded}">
+              <span class="cp-chevron"><i class="fa-solid fa-chevron-right"></i></span>
+              <span class="cp-mini-ring" style="--pct:${stats.percent}"><span>${stats.percent}%</span></span>
+              <span class="cp-subject-name">${escapeHtml(cpSubjectName(code))}</span>
+            </button>
+          </div>
           <div class="cp-subject-progress-track"><div class="cp-subject-progress-fill" style="width:${stats.percent}%"></div></div>
-          <div class="cp-subject-meta">${stats.completed} / ${stats.total} Chapters Completed · ${stats.remaining} Remaining</div>
-          <div class="cp-chapter-list" id="cpList-${code}" ${expanded ? '' : 'hidden'}>${itemsHtml}</div>
+          <div class="cp-subject-meta">${stats.completed} / ${stats.total} Chapters Completed · ${stats.remaining} Remaining${examMetaText}</div>
+          <div class="cp-chapter-list-wrap ${expanded ? 'cp-expanded' : ''}">
+            <div class="cp-chapter-list-inner">
+              <div class="cp-chapter-list" id="cpList-${code}">${itemsHtml}</div>
+            </div>
+          </div>
         </div>`;
     }).join('');
 
     emptyState.hidden = anyVisible;
 
-    // Wire checkboxes
-    wrap.querySelectorAll('.cp-chapter-checkbox').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        const code = e.target.dataset.code;
-        const idx = Number(e.target.dataset.idx);
-        cpSetDone(code, idx, e.target.checked);
-        renderChapterProgress();
+    // Chapter status cycle (incomplete → reading → completed → …)
+    wrap.querySelectorAll('.cp-status-btn').forEach(btn => {
+      btn.addEventListener('click', () => cpCycleStatus(btn.dataset.code, Number(btn.dataset.idx)));
+    });
+
+    // Important/star toggle (doesn't affect progress %, so just re-paint the accordion)
+    wrap.querySelectorAll('.cp-star-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        cpToggleStar(btn.dataset.code, Number(btn.dataset.idx));
+        renderChapterAccordion();
       });
     });
 
-    // Wire accordion toggles
+    // Accordion toggle — single subject open at a time, remembered across visits
     wrap.querySelectorAll('[data-cp-toggle]').forEach(btn => {
+      const code = btn.dataset.cpToggle;
       btn.addEventListener('click', () => {
-        const code = btn.dataset.cpToggle;
-        if (cpExpanded.has(code)) cpExpanded.delete(code);
-        else cpExpanded.add(code);
-        persist(CP_EXPANDED_KEY, Array.from(cpExpanded));
+        cpOpenCode = (cpOpenCode === code) ? null : code;
+        persist(CP_OPEN_KEY, cpOpenCode);
         renderChapterAccordion();
+      });
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' && cpOpenCode !== code) {
+          e.preventDefault();
+          cpOpenCode = code;
+          persist(CP_OPEN_KEY, cpOpenCode);
+          renderChapterAccordion();
+        } else if (e.key === 'ArrowUp' && cpOpenCode === code) {
+          e.preventDefault();
+          cpOpenCode = null;
+          persist(CP_OPEN_KEY, cpOpenCode);
+          renderChapterAccordion();
+        }
       });
     });
   }
@@ -935,30 +1176,24 @@
   function renderChapterProgress() {
     renderChapterSummary();
     renderChapterAccordion();
+    // Preparation % in the routine table/cards and hero card is derived
+    // from chapter completion, so force those to repaint with fresh numbers.
+    lastVisibleKey = null;
+    renderAll();
   }
 
-  function cpExportJson() {
-    const payload = { exportedAt: new Date().toISOString(), subjects: {} };
-    Object.keys(CHAPTERS).forEach(code => {
-      const stats = cpSubjectStats(code);
-      payload.subjects[cpSubjectName(code)] = {
-        code,
-        percent: stats.percent,
-        completed: stats.completed,
-        total: stats.total,
-        chapters: CHAPTERS[code].map((text, idx) => ({ chapter: text, completed: cpIsDone(code, idx) })),
-      };
-    });
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'chapter-progress.json';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    showToast('Chapter progress exported as JSON.', 'success', 'fa-solid fa-file-export');
+  // Bridges a click on a routine-table subject/progress cell to the
+  // matching subject in the tracker below: opens it and scrolls to it.
+  function jumpToChapter(code) {
+    cpOpenCode = code;
+    persist(CP_OPEN_KEY, cpOpenCode);
+    renderChapterAccordion();
+    const el = document.querySelector(`.cp-subject[data-code="${code}"]`);
+    if (el) {
+      if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('cp-jump-flash');
+      setTimeout(() => el.classList.remove('cp-jump-flash'), 1400);
+    }
   }
 
   function cpResetProgress() {
@@ -997,8 +1232,179 @@
       });
     });
 
-    document.getElementById('cpExportBtn').addEventListener('click', cpExportJson);
     document.getElementById('cpResetBtn').addEventListener('click', cpResetProgress);
+  }
+
+  /* =========================================================
+     20. FIRST-TIME ONBOARDING + PROFILE SYSTEM (added feature)
+     ========================================================= */
+
+  const PROFILE_KEY = 'rpi_profile'; // { name, roll, onboarded }
+  const WELCOME_MESSAGES = [
+    "Consistency beats intensity. Let's study today!",
+    "Small progress every day leads to big success.",
+    "Every completed chapter brings you closer to your dream.",
+    "Stay focused. Your future self will thank you.",
+    "One chapter at a time. You've got this!",
+    "Today's effort is tomorrow's achievement.",
+  ];
+
+  let onboardingMode = 'onboarding'; // 'onboarding' | 'edit'
+
+  function getProfile() {
+    return safeParse(localStorage.getItem(PROFILE_KEY), null);
+  }
+  function saveProfile(profile) {
+    persist(PROFILE_KEY, profile);
+  }
+
+  function greetingParts(now) {
+    const hour = now.getHours();
+    if (hour >= 5 && hour < 12) return { period: 'Morning', emoji: '🌅' };
+    if (hour >= 12 && hour < 17) return { period: 'Afternoon', emoji: '☀️' };
+    if (hour >= 17 && hour < 20) return { period: 'Evening', emoji: '🌇' };
+    return { period: 'Night', emoji: '🌙' };
+  }
+
+  // Runs every tick — cheap textContent updates only (greeting, chapter count).
+  function renderWelcomeGreeting() {
+    const greetingEl = document.getElementById('welcomeGreeting');
+    if (!greetingEl) return;
+    const profile = getProfile();
+    const displayName = (profile && profile.name) ? profile.name : 'Student';
+    const hasRealName = !!(profile && profile.name && profile.name !== 'Student');
+    const { period, emoji } = greetingParts(new Date());
+
+    greetingEl.textContent = `${emoji} Good ${period}, ${displayName}`;
+    document.getElementById('welcomeSub').textContent = hasRealName
+      ? "Welcome back! Let's make today productive and move one step closer to your goal."
+      : 'Ready to continue your preparation today?';
+
+    const chapterCountEl = document.getElementById('welcomeChapterCount');
+    if (chapterCountEl && typeof cpOverallStats === 'function') {
+      chapterCountEl.textContent = cpOverallStats().completedChapters;
+    }
+
+    const menuNameEl = document.getElementById('profileMenuName');
+    if (menuNameEl) menuNameEl.textContent = displayName;
+  }
+
+  // Runs once per page load — a random pick, not on every tick.
+  function renderWelcomeMotivation() {
+    const el = document.getElementById('welcomeMotivation');
+    if (el) el.textContent = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
+  }
+
+  function showOnboarding(mode) {
+    onboardingMode = mode;
+    const overlay = document.getElementById('onboardingOverlay');
+    const title = document.getElementById('onboardingTitle');
+    const sub = document.getElementById('onboardingSub');
+    const continueBtn = document.getElementById('onboardingContinueBtn');
+    const skipBtn = document.getElementById('onboardingSkipBtn');
+    const nameInput = document.getElementById('onboardingNameInput');
+    const rollInput = document.getElementById('onboardingRollInput');
+
+    const profile = getProfile();
+
+    if (mode === 'edit') {
+      title.textContent = 'Edit Your Profile';
+      sub.textContent = 'Update your name or roll number anytime.';
+      continueBtn.textContent = 'Save';
+      skipBtn.textContent = 'Cancel';
+      nameInput.value = (profile && profile.name && profile.name !== 'Student') ? profile.name : '';
+      rollInput.value = (profile && profile.roll) ? profile.roll : '';
+    } else {
+      title.textContent = 'Welcome, Future Topper!';
+      sub.textContent = "Let's personalize your experience.";
+      continueBtn.textContent = 'Continue';
+      skipBtn.textContent = 'Skip for now';
+      nameInput.value = '';
+      rollInput.value = '';
+    }
+
+    overlay.hidden = false;
+    setTimeout(() => nameInput.focus(), 50);
+  }
+
+  function hideOnboarding() {
+    document.getElementById('onboardingOverlay').hidden = true;
+  }
+
+  function commitOnboarding() {
+    const nameVal = document.getElementById('onboardingNameInput').value.trim() || 'Student';
+    const rollVal = document.getElementById('onboardingRollInput').value.trim();
+    saveProfile({ name: nameVal, roll: rollVal, onboarded: true });
+    hideOnboarding();
+    renderWelcomeGreeting();
+    showToast(onboardingMode === 'edit' ? 'Profile updated.' : `Welcome, ${nameVal}! 👋`, 'success', onboardingMode === 'edit' ? 'fa-solid fa-user-check' : 'fa-solid fa-hand-sparkles');
+  }
+
+  function skipOrCancelOnboarding() {
+    if (onboardingMode === 'onboarding') {
+      saveProfile({ name: 'Student', roll: '', onboarded: true });
+      renderWelcomeGreeting();
+    }
+    hideOnboarding();
+  }
+
+  function initProfileSystem() {
+    const profile = getProfile();
+    if (!profile || !profile.onboarded) {
+      showOnboarding('onboarding');
+    }
+    renderWelcomeGreeting();
+    renderWelcomeMotivation();
+
+    document.getElementById('onboardingContinueBtn').addEventListener('click', commitOnboarding);
+    document.getElementById('onboardingSkipBtn').addEventListener('click', skipOrCancelOnboarding);
+    document.getElementById('onboardingNameInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commitOnboarding();
+    });
+    document.getElementById('onboardingRollInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commitOnboarding();
+    });
+    document.getElementById('onboardingRollInput').addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    });
+
+    // Profile menu open/close
+    const profileBtn = document.getElementById('profileBtn');
+    const profileMenu = document.getElementById('profileMenu');
+    profileBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = profileMenu.hidden;
+      profileMenu.hidden = !willOpen;
+      profileBtn.setAttribute('aria-expanded', String(willOpen));
+    });
+    document.addEventListener('click', (e) => {
+      if (!profileMenu.hidden && !e.target.closest('.profile-menu-wrap')) {
+        profileMenu.hidden = true;
+        profileBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    document.querySelectorAll('[data-profile-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        profileMenu.hidden = true;
+        profileBtn.setAttribute('aria-expanded', 'false');
+        const action = btn.dataset.profileAction;
+
+        if (action === 'edit-name' || action === 'edit-roll') {
+          showOnboarding('edit');
+          if (action === 'edit-roll') setTimeout(() => document.getElementById('onboardingRollInput').focus(), 60);
+        } else if (action === 'reset') {
+          if (!window.confirm('Reset your profile (name & roll number)? You will be asked to enter them again.')) return;
+          localStorage.removeItem(PROFILE_KEY);
+          renderWelcomeGreeting();
+          showOnboarding('onboarding');
+        } else if (action === 'logout') {
+          if (!window.confirm('Logout will clear all saved data on this device (profile, chapter progress, preferences). Continue?')) return;
+          localStorage.clear();
+          window.location.reload();
+        }
+      });
+    });
   }
 
   /* ---------------------------------------------------------
@@ -1006,15 +1412,19 @@
      --------------------------------------------------------- */
   function init() {
     initTheme();
-    renderQuote();
+    renderQuote(true);
     initEvents();
     renderAll();
     initChapterProgress();
+    initProfileSystem();
 
     setInterval(() => {
       renderAll();
       updateNotifDot(new Date());
+      maybeExamReminder(new Date());
     }, 1000);
+
+    setInterval(() => renderQuote(false), 13000);
 
     // Hide loading screen once first paint is ready
     window.addEventListener('load', () => {
