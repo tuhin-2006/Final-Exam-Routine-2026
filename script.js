@@ -288,12 +288,19 @@
   /* ---------------------------------------------------------
      8. TABLE + CARD RENDER
      --------------------------------------------------------- */
+  function progressTier(val) {
+    if (val >= 100) return 'done';
+    if (val >= 70) return 'high';
+    if (val >= 40) return 'mid';
+    return 'low';
+  }
+
   function buildMiniProgress(exam, prefix) {
     const val = getPrepPercent(exam.code);
     return `
       <button type="button" class="mini-progress" data-code="${exam.code}" title="Open ${escapeHtml(exam.subject)} in the chapter tracker">
-        <div class="mini-progress-track"><div class="mini-progress-fill" style="width:${val}%"></div></div>
-        <span class="mini-progress-val">${val}%</span>
+        <div class="mini-progress-track"><div class="mini-progress-fill mini-progress-tier-${progressTier(val)}" style="width:${val}%"></div></div>
+        <span class="mini-progress-val mini-progress-val-${progressTier(val)}">${val}%</span>
         <i class="fa-solid fa-arrow-up-right-from-square mini-progress-link-icon"></i>
       </button>`;
   }
@@ -426,9 +433,12 @@
           </div>
           <div class="rc-countdown ${cdClass}">${cdText}</div>
           <button type="button" class="rc-progress" data-code="${exam.code}" title="Open ${escapeHtml(exam.subject)} in the chapter tracker">
-            <div class="rc-progress-track"><div class="rc-progress-fill" style="width:${val}%"></div></div>
-            <span class="rc-progress-val">${val}%</span>
-            <i class="fa-solid fa-arrow-up-right-from-square mini-progress-link-icon"></i>
+            <div class="rc-progress-head">
+              <span class="rc-progress-label"><i class="fa-solid fa-chart-line"></i> Preparation</span>
+              <span class="rc-progress-val rc-progress-val-${progressTier(val)}">${val}%</span>
+            </div>
+            <div class="rc-progress-track"><div class="rc-progress-fill rc-progress-tier-${progressTier(val)}" style="width:${val}%"></div></div>
+            <span class="rc-progress-hint">Tap to open chapter tracker <i class="fa-solid fa-arrow-up-right-from-square"></i></span>
           </button>
         </div>`;
     }).join('');
